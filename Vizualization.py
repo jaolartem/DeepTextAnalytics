@@ -1,89 +1,134 @@
+import logging
 import os
-import random
 import matplotlib.pyplot as plt
 import networkx as nx
-import nltk
 from collections import Counter
 from nltk.util import ngrams
 from wordcloud import WordCloud
 
-# Necesario para el análisis de categorías gramaticales
-nltk.download('averaged_perceptron_tagger')
-nltk.download('punkt')
+# Configure logging to record errors in 'text_anal.log'
+logging.basicConfig(filename='text_anal.log', level=logging.ERROR,
+                    format='%(asctime)s:%(levelname)s:%(message)s')
 
-# Función para plotear gráficos de barras para n-gramas
 def plot_ngrams(words, n, list_name):
-    n_grams = list(ngrams(words, n))
-    ngram_freq = Counter(n_grams)
-    top_ngrams = ngram_freq.most_common(10)
+    """
+    Generates and saves a bar plot of the most common n-grams in a given list of words.
 
-    labels, values = zip(*top_ngrams)
-    indexes = range(len(labels))
+    Parameters:
+    words (list of str): The list of words from which to generate n-grams.
+    n (int): The number of words in each n-gram.
+    list_name (str): The name of the list, used to create the save path for the plot.
 
-    plt.figure(figsize=(10, 8))
-    plt.bar(indexes, values, align='center')
-    plt.xticks(indexes, [' '.join(label) for label in labels], rotation='vertical')
-    plt.tight_layout()
+    Returns:
+    None: The function saves the plot as a file and does not return any value.
+    """
+    try:
+        # Ensure the directory exists
+        os.makedirs(f'results/{list_name}', exist_ok=True)
 
-    plt.savefig(f'results/{list_name}/top_{n}_grams.png')
-    plt.close()
+        # Generate n-grams and calculate frequencies
+        n_grams = list(ngrams(words, n))
+        ngram_freq = Counter(n_grams)
+        top_ngrams = ngram_freq.most_common(10)
 
-# Función para crear una nube de palabras
+        # Prepare plot labels and values
+        labels, values = zip(*top_ngrams) if top_ngrams else ([], [])
+        indexes = range(len(labels))
+
+        # Plotting
+        plt.figure(figsize=(10, 8))
+        plt.bar(indexes, values, align='center')
+        plt.xticks(indexes, [' '.join(label) for label in labels], rotation='vertical')
+        plt.tight_layout()
+
+        # Save and close the plot
+        plt.savefig(f'results/{list_name}/top_{n}_grams.png')
+        plt.close()
+    except Exception as e:
+        logging.error(f"Error in plot_ngrams for list {list_name}: {e}")
+
 def create_wordcloud(word_freq, list_name):
-    images = os.listdir('Images')
-    image_path = os.path.join('Images', random.choice(images))
+    """
+    Creates and saves a word cloud image based on the frequency distribution of words.
 
-    wordcloud = WordCloud(width=800, height=800, background_color='white', mask=image_path).generate_from_frequencies(word_freq)
+    Parameters:
+    word_freq (dict): A dictionary with words as keys and their frequencies as values.
+    list_name (str): The name of the list, used to create the save path for the word cloud image.
 
-    plt.figure(figsize=(8, 8), facecolor=None)
-    plt.imshow(wordcloud)
-    plt.axis("off")
-    plt.tight_layout(pad=0)
+    Returns:
+    None: The function saves the word cloud image as a file and does not return any value.
+    """
+    try:
+        # Ensure the directory exists
+        os.makedirs(f'results/{list_name}', exist_ok=True)
 
-    plt.savefig(f'results/{list_name}/wordcloud.png')
-    plt.close()
+        # Generate word cloud
+        wordcloud = WordCloud(width=800, height=400, background_color='white').generate_from_frequencies(word_freq)
+        
+        # Plotting
+        plt.figure(figsize=(10, 5))
+        plt.imshow(wordcloud, interpolation='bilinear')
+        plt.axis('off')
 
-# Función para plotear un gráfico de red de palabras
+        # Save and close the plot
+        plt.savefig(f'results/{list_name}/wordcloud.png')
+        plt.close()
+    except Exception as e:
+        logging.error(f"Error in create_wordcloud for list {list_name}: {e}")
+
 def plot_word_network(words, list_name):
-    G = nx.Graph()
-    G.add_edges_from(ngrams(words, 2))
+    """
+    Creates and saves a network graph of words based on their bigram relationships.
 
-    plt.figure(figsize=(12, 12))
-    pos = nx.spring_layout(G, k=0.1)
-    nx.draw(G, pos, with_labels=True, node_color='skyblue', edge_color='gray')
+    Parameters:
+    words (list of str): A list of words to be used for creating the network graph.
+    list_name (str): The name of the list, used to create the save path for the network graph image.
 
-    plt.savefig(f'results/{list_name}/word_network.png')
-    plt.close()
+    Returns:
+    None: The function saves the network graph as a file and does not return any value.
+    """
+    try:
+        # Ensure the directory exists
+        os.makedirs(f'results/{list_name}', exist_ok=True)
 
-# Función para plotear un histograma de diversidad léxica
+        # Generate network graph
+        G = nx.Graph()
+        G.add_edges_from(ngrams(words, 2))
+
+        # Plotting
+        plt.figure(figsize=(12, 8))
+        nx.draw(G, with_labels=True, font_weight='bold')
+
+        # Save and close the plot
+        plt.savefig(f'results/{list_name}/word_network.png')
+        plt.close()
+    except Exception as e:
+        logging.error(f"Error in plot_word_network for list {list_name}: {e}")
+
 def plot_lexical_diversity_histogram(diversities, list_name):
-    plt.figure(figsize=(10, 6))
-    plt.hist(diversities, bins=20, color='skyblue')
-    plt.title('Histograma de Diversidad Léxica')
-    plt.xlabel('Diversidad Léxica')
-    plt.ylabel('Frecuencia')
+    """
+    Creates and saves a histogram of lexical diversities.
 
-    plt.savefig(f'results/{list_name}/lexical_diversity_histogram.png')
-    plt.close()
+    Parameters:
+    diversities (list of float): A list of lexical diversity scores to be plotted.
+    list_name (str): The name of the list, used to create the save path for the histogram.
 
-# Función para integrar y guardar todos los análisis
-def integrate_analysis_and_save(words_dict, list_name):
-    os.makedirs(f'results/{list_name}', exist_ok=True)
+    Returns:
+    None: The function saves the histogram as a file and does not return any value.
+    """
+    try:
+        # Ensure the directory exists
+        os.makedirs(f'results/{list_name}', exist_ok=True)
 
-    for n in range(1, 6):  # De 1-grama a 5-grama
-        plot_ngrams(words_dict[list_name], n, list_name)
+        # Plotting
+        plt.figure(figsize=(10, 6))
+        plt.hist(diversities, bins=20, color='skyblue')
+        plt.title('Lexical Diversity Histogram')
+        plt.xlabel('Lexical Diversity')
+        plt.ylabel('Frequency')
 
-    # Crear y guardar la nube de palabras
-    word_freq = Counter(words_dict[list_name])
-    create_wordcloud(word_freq, list_name)
-
-    # Crear y guardar el gráfico de red
-    plot_word_network(words_dict[list_name], list_name)
-
-    # Calcular y guardar el histograma de diversidad léxica
-    diversity = [len(set(words)) / len(words) if words else 0 for words in words_dict.values()]
-    plot_lexical_diversity_histogram(diversity, list_name)
-
-# Ejemplo de uso
-# words_dict = {'my_list': ['your', 'sample', 'text', 'goes', 'here']}
-# integrate_analysis_and_save(words_dict, 'my_list')
+        # Save and close the plot
+        plt.savefig(f'results/{list_name}/lexical_diversity_histogram.png')
+        plt.close()
+    except Exception as e:
+        logging.error(f"Error in plot_lexical_diversity_histogram for list {list_name}: {e}")

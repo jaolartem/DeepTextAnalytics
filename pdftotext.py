@@ -1,20 +1,17 @@
+
+import logging
 import PyPDF2
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from langdetect import detect
-import logging
+from pathlib import Path
+from collections import Counter
+import uuid
 
-# Logging configuration to record errors in a file named 'text_anal.log'
+# Logging configuration
 logging.basicConfig(filename='text_anal.log', level=logging.ERROR,
                     format='%(asctime)s:%(levelname)s:%(message)s')
-
-# Download necessary NLTK data (punkt tokenizer models and stopwords)
-try:
-    nltk.download('punkt')
-    nltk.download('stopwords')
-except Exception as e:
-    logging.error(f"Error downloading NLTK data: {e}")
 
 # Function to extract text from a PDF file
 def extract_text_from_pdf(pdf_path):
@@ -23,7 +20,6 @@ def extract_text_from_pdf(pdf_path):
             reader = PyPDF2.PdfFileReader(file)
             num_pages = reader.numPages
             text = ''
-            # Extract text from each page
             for page in range(num_pages):
                 text += reader.getPage(page).extractText()
             return text
@@ -47,7 +43,6 @@ def get_words_without_stopwords(text, language):
     try:
         stop_words = set(stopwords.words(language))
         words = word_tokenize(text)
-        # Filter words not in stop words and are alphabetic
         filtered_words = [word for word in words if word.lower() not in stop_words and word.isalpha()]
         return filtered_words
     except LookupError:
@@ -57,14 +52,29 @@ def get_words_without_stopwords(text, language):
         logging.error(f"Error filtering stopwords: {e}")
         return []
 
-# Path to the PDF file
-pdf_path = 'your_file.pdf'
+def process_pdf_path(path):
+    words_by_file = {}  # Dictionary for words by file, including language and unique identifier
 
-# Extract text and filter words
-pdf_text = extract_text_from_pdf(pdf_path)
-if pdf_text:
-    detected_language = detect_language(pdf_text)
-    filtered_words = get_words_without_stopwords(pdf_text, detected_language)
-    print(filtered_words)
-else:
-    print("Error extracting text from PDF.")
+    def process_pdf_file(pdf_path):
+        pdf_text = extract_text_from_pdf(str(pdf_path))
+        if pdf_text:
+            detected_language = detect_language(pdf_text)
+            filtered_words = get_words_without_stopwords(pdf_text, detected_language)
+
+            unique_id = str(uuid.uuid4())
+            words_by_file[unique_id] = {
+                'file_name': pdf_path.name,
+                'language': detected_language,
+                'words': filtered_words
+            }
+
+    path = Path(path)
+    if path.is_file() and path.suffix.lower() == '.pdf':
+        process_pdf_file(path)
+    elif path.is_dir():
+        for pdf_file in path.glob('*.pdf'):
+            process_pdf_file(pdf_file)
+
+    return words_by_file
+
+# Other functions and main part of the script would remain the same
