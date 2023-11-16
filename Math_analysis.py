@@ -1,6 +1,9 @@
 import logging
 from nltk import word_tokenize, pos_tag
 from nltk.probability import FreqDist
+from pdftotext import get_language_name_from_code
+import pyphen
+from langdetect import detect
 from collections import Counter
 import networkx as nx
 from nltk.util import ngrams
@@ -8,6 +11,9 @@ from nltk.collocations import BigramCollocationFinder
 from nltk.metrics import BigramAssocMeasures
 from itertools import combinations
 from nltk.tokenize import sent_tokenize
+
+
+
 
 def analyze_collocations(words):
     """
@@ -23,11 +29,6 @@ def analyze_collocations(words):
     finder = BigramCollocationFinder.from_words(words)
     return finder.nbest(bigram_measures.pmi, 10)  # Top 10 collocations
 
-
-
-# Configure logging to record errors
-logging.basicConfig(filename='text_anal.log', level=logging.ERROR,
-                    format='%(asctime)s:%(levelname)s:%(message)s')
 
 def lexical_diversity(text):
     """
@@ -184,6 +185,28 @@ def co_occurrence_analysis(words, window_size=2):
             co_occurrence[pair] = co_occurrence.get(pair, 0) + 1
     return co_occurrence
 
+
+
+def count_syllables(word, language_code):
+    """
+    Counts the number of syllables in a given word using Pyphen library.
+
+    Args:
+        word (str): The word to count syllables in.
+        language_code (str): ISO 639-1/2 language code.
+
+    Returns:
+        int: Number of syllables in the word.
+    """
+    try:
+        dic = pyphen.Pyphen(lang=language_code)
+        hyphenated = dic.inserted(word)
+        return len(hyphenated.split('-'))
+    except Exception as e:
+        logging.error(f"Error in count_syllables: {e}")
+        return 0  # Devuelve 0 en caso de error
+
+
 def readability_index(text):
     """
     Calculates the Flesch Reading Ease score for the given text.
@@ -194,13 +217,21 @@ def readability_index(text):
     Returns:
         float: Flesch Reading Ease score.
     """
-    sentences = sent_tokenize(text)
-    words = word_tokenize(text)
-    syllable_count = sum([count_syllables(word) for word in words])  # Define count_syllables() appropriately
-    words_per_sentence = len(words) / len(sentences)
-    syllables_per_word = syllable_count / len(words)
-    return 206.835 - 1.015 * words_per_sentence - 84.6 * syllables_per_word
+    try:
+        if not isinstance(text, str) or not text.strip():
+            return 0  # Devuelve 0 para texto vacío o no válido
 
-def count_syllables(word):
-    # Implement a syllable counting algorithm, or use a library function
-    pass
+        sentences = sent_tokenize(text)
+        words = word_tokenize(text)
+        if not sentences or not words:
+            return 0  # Evita división por cero
+
+        language_code = detect(text)
+        syllable_count = sum([count_syllables(word, language_code) for word in words])
+        words_per_sentence = len(words) / len(sentences)
+        return 206.835 - 1.015 * words_per_sentence - 84.6 * (syllable_count / len(words))
+    except Exception as e:
+        logging.error(f"Error in readability_index: {e}")
+        return 0
+
+

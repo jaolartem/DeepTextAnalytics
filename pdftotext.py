@@ -12,9 +12,7 @@ nltk.download('stopwords', quiet=True)
 nltk.download('punkt', quiet=True)
 
 # Configure logging to record errors in 'text_anal.log'
-logging.basicConfig(filename='text_anal.log', level=logging.ERROR,
-                    format='%(asctime)s:%(levelname)s:%(message)s',
-                    handlers=[logging.FileHandler('text_anal.log'), logging.StreamHandler()])
+
 
 
 def extract_text_from_pdf(pdf_path):
