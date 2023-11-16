@@ -27,10 +27,7 @@ def plot_ngrams(words, n, list_name):
     None: The function saves the plot as a file and does not return any value.
     """
     try:
-        # Ensure the directory exists
-        Path(f'results/{list_name}').mkdir(parents=True, exist_ok=True)
-
-        # Generate n-grams and calculate frequencies
+       # Generate n-grams and calculate frequencies
         n_grams = list(ngrams(words, n))
         ngram_freq = Counter(n_grams)
         top_ngrams = ngram_freq.most_common(10)
@@ -39,26 +36,31 @@ def plot_ngrams(words, n, list_name):
         labels, values = zip(*top_ngrams) if top_ngrams else ([], [])
         indexes = range(len(labels))
 
+        # Define a unique color for each n-gram
+        colors = plt.cm.jet([i / float(len(labels) - 1) for i in range(len(labels))])
+
         # Plotting
-        fig, ax = plt.subplots(figsize=(10, 8))
-        ax.bar(indexes, values, align='center')
+        fig, ax = plt.subplots(figsize=(24, 16))
+        bars = ax.bar(indexes, values, align='center', color=colors)
 
-        # Add a table at the right of the axes
-        table_data = [[label] for label in labels]
-        ax.table(cellText=table_data, colLabels=['N-grams'], cellLoc='center', loc='right')
+        # Adding the numbered labels on top of each bar
+        for i, bar in enumerate(bars):
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), str(i+1), 
+                    ha='center', va='bottom')
 
-        # Adjust layout to make room for the table:
-        plt.subplots_adjust(right=0.5)
-        plt.xticks(indexes, [''] * len(labels))  # Hide the x labels
-        plt.tight_layout()
+        # Create a legend for the colors
+        ngram_labels = [' '.join(ngram) for ngram in labels]
+        plt.legend(bars, ngram_labels, title="N-grams")
 
-        # Remove axes spines and grid
+        # Adjust layout
+        plt.xticks(indexes, ngram_labels, rotation=45, ha='right')  # Show x labels
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-        ax.spines['bottom'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.yaxis.set_visible(False)
-        ax.xaxis.set_visible(False)
+        ax.spines['left'].set_visible(True)
+        ax.yaxis.set_visible(True)
+        ax.xaxis.set_visible(True)
+        plt.ylabel('Frequency')
+        plt.tight_layout()
         
         # Save and close the plot
         plt.savefig(f'results/{list_name}/top_{n}_grams.png')
@@ -103,34 +105,44 @@ def create_wordcloud(word_freq, list_name):
     except Exception as e:
         logging.error(f"Error in create_wordcloud for list {list_name}: {e}")
 
-def plot_word_network(words, list_name):
+def create_wordcloud(word_freq, list_name):
     """
-    Creates and saves a network graph of words based on their bigram relationships.
+    Creates and saves a word cloud image based on the frequency distribution of words
+    using an image silhouette as a mask, with increased size for better visibility.
 
     Parameters:
-    words (list of str): A list of words to be used for creating the network graph.
-    list_name (str): The name of the list, used to create the save path for the network graph image.
+    word_freq (dict): A dictionary with words as keys and their frequencies as values.
+    list_name (str): The name of the list, used to create the save path for the word cloud image.
 
     Returns:
-    None: The function saves the network graph as a file and does not return any value.
+    None: The function saves the word cloud image as a file and does not return any value.
     """
     try:
-        # Ensure the directory exists
+        # Ensure the 'results' directory exists
         Path(f'results/{list_name}').mkdir(parents=True, exist_ok=True)
+        
+        # Assuming the 'Images' directory is in the same directory as the script
+        # Here you might need to provide the actual path to your silhouette image
+        image_path = next(Path().cwd().joinpath('Images').glob('*.png'))  # Grabbing the first .png image
 
-        # Generate network graph
-        G = nx.Graph()
-        G.add_edges_from(ngrams(words, 2))
+        # Load the silhouette for the mask
+        silhouette_image = Image.open(image_path)
+        mask = np.array(silhouette_image)
 
-        # Plotting
-        plt.figure(figsize=(12, 8))
-        nx.draw(G, with_labels=True, font_weight='bold')
+        # Generate word cloud with increased size
+        wordcloud = WordCloud(width=1600, height=800, background_color='white', mask=mask,
+                              contour_width=1, contour_color='steelblue').generate_from_frequencies(word_freq)
+        
+        # Plotting with an increased figure size
+        plt.figure(figsize=(20, 10))
+        plt.imshow(wordcloud, interpolation='bilinear')
+        plt.axis('off')
 
         # Save and close the plot
-        plt.savefig(f'results/{list_name}/word_network.png')
+        plt.savefig(f'results/{list_name}/wordcloud.png', dpi=300)  # Increased dpi for better resolution
         plt.close()
     except Exception as e:
-        logging.error(f"Error in plot_word_network for list {list_name}: {e}")
+        logging.error(f"Error in create_wordcloud for list {list_name}: {e}")
 
 def plot_lexical_diversity_histogram(diversities, list_name):
     """
