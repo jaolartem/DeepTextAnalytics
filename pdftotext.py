@@ -14,7 +14,6 @@ nltk.download('punkt', quiet=True)
 # Configure logging to record errors in 'text_anal.log'
 
 
-
 def extract_text_from_pdf(pdf_path):
     """
     Extracts text from a PDF file.
@@ -23,17 +22,16 @@ def extract_text_from_pdf(pdf_path):
         pdf_path (str): Path to the PDF file.
 
     Returns:
-        str: The extracted text from the PDF, or None if an error occurs.
+        str: The extracted text from the PDF, or an empty string if an error occurs.
     """
     try:
         with open(pdf_path, 'rb') as file:
             reader = PyPDF2.PdfFileReader(file)
-            text = ''.join(reader.getPage(page).extractText() for page in range(reader.numPages))
+            text = ''.join([reader.getPage(page).extractText() for page in range(reader.numPages)])
             return text
-    except (FileNotFoundError, PyPDF2.utils.PdfReadError) as e:
+    except Exception as e:
         logging.error(f"Error reading PDF {pdf_path}: {e}")
-        return None
-
+        return ""
 
 def get_language_name_from_code(code):
     """
@@ -69,15 +67,14 @@ def get_words_without_stopwords(text, language_code):
         list: A list containing the filtered words.
     """
     try:
-        language_code = detect(text)
         language = get_language_name_from_code(language_code)            
         stop_words = set(stopwords.words(language))
-    except OSError:
-        logging.warning(f"Stopwords not found for detected language '{language}'. Using English stopwords as default.")
-        stop_words = set(stopwords.words('english'))
-    
-    words = word_tokenize(text)
-    return [word for word in words if word.lower() not in stop_words and word.isalpha()]
+        words = word_tokenize(text)
+        return [word for word in words if word.lower() not in stop_words and word.isalpha()]
+    except Exception as e:
+        logging.error(f"Error in removing stopwords: {e}")
+        return []
+
 
 
 def process_pdf_file(pdf_path):
@@ -93,22 +90,17 @@ def process_pdf_file(pdf_path):
     try:
         pdf_text = extract_text_from_pdf(str(pdf_path))
         if pdf_text:
-            try:
-                language_code = detect(pdf_text)
-            except LangDetectException:
-                logging.warning(f"Language detection failed for file {pdf_path}")
-                language_code = 'unknown'
-
+            language_code = detect(pdf_text) if pdf_text.strip() else 'unknown'
             filtered_words = get_words_without_stopwords(pdf_text, language_code)
             return {
                 'file_name': pdf_path.stem,
                 'language': get_language_name_from_code(language_code),
                 'words': filtered_words
             }
+        return None
     except Exception as e:
         logging.error(f"Error processing PDF file {pdf_path}: {e}")
         return None
-
 
 def process_pdf_path(path):
     """
@@ -120,42 +112,51 @@ def process_pdf_path(path):
     Returns:
         tuple: A tuple containing the processed data for each file and summary data for all files combined.
     """
-    words_by_file = {}
-    all_words = []
-    language_distribution = {}
+    try:
+        words_by_file = {}
+        all_words = []
+        language_distribution = {}
 
-    path = Path(path)
-    pdf_paths = [path] if path.is_file() else path.glob('*.pdf')
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"The specified path '{path}' does not exist.")
 
-    for pdf_path in pdf_paths:
-        file_data = process_pdf_file(pdf_path)
-        if file_data:
-            # Extend the word list for each language and increment the document count
-            language = file_data['language']
-            language_distribution.setdefault(language, {'file_name': f"All_records_{language}", 'language': language, 'documents': 0, 'words': []})
-            language_distribution[language]['words'].extend(file_data['words'])
-            language_distribution[language]['documents'] += 1
+        pdf_paths = [path] if path.is_file() else list(path.glob('*.pdf'))
 
-            # Add all words to the complete word list
-            all_words.extend(file_data['words'])
+        if not pdf_paths:
+            raise ValueError(f"No PDF files found in the specified path '{path}'.")
 
-            # Create a unique entry for each processed file
-            unique_id = str(uuid.uuid4())
-            words_by_file[unique_id] = file_data
+        for pdf_path in pdf_paths:
+            file_data = process_pdf_file(pdf_path)
+            if file_data:
+                # Extend the word list for each language and increment the document count
+                language = file_data['language']
+                language_distribution.setdefault(language, {'file_name': f"All_records_{language}", 'language': language, 'documents': 0, 'words': []})
+                language_distribution[language]['words'].extend(file_data['words'])
+                language_distribution[language]['documents'] += 1
 
-    # Create a summary record for all languages combined
-    all_languages = 'all'
-    all_records = {
-        'file_name': "All_records",
-        'language': all_languages,
-        'documents': len(words_by_file),
-        'words': all_words
-    }
+                # Add all words to the complete word list
+                all_words.extend(file_data['words'])
 
-    # Add the summary record to the language distribution
-    language_distribution[all_languages] = all_records
+                # Create a unique entry for each processed file
+                unique_id = str(uuid.uuid4())
+                words_by_file[unique_id] = file_data
 
-    return words_by_file, language_distribution
+        # Create a summary record for all languages combined
+        all_languages = 'all'
+        all_records = {
+            'file_name': "All_records",
+            'language': all_languages,
+            'documents': len(words_by_file),
+            'words': all_words
+        }
+
+        # Add the summary record to the language distribution
+        language_distribution[all_languages] = all_records
+
+        return words_by_file, language_distribution
+    except Exception as e:
+        logging.error(f"Error processing path '{path}': {e}")
+        return {}, {}
 
 
-# Example usage and other functions can be placed here.

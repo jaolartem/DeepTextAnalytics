@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 from pdftotext import process_pdf_path
 from Math_analysis import lexical_diversity, pos_tag_frequency, word_network_analysis, analyze_collocations,readability_index  
-from Vizualization import plot_ngrams, create_wordcloud, plot_word_network, plot_lexical_diversity_histogram, plot_pos_frequency_distribution, plot_word_length_distribution, plot_readability_index
+from Vizualization import plot_ngrams, create_wordcloud, plot_word_network, plot_lexical_diversity_histogram, plot_pos_frequency_distribution, plot_word_length_distribution, plot_readability_index, create_wordcloud_multi
 from collections import Counter
 
 logging.basicConfig(filename='text_anal.log', level=logging.ERROR,
@@ -12,25 +12,54 @@ logging.basicConfig(filename='text_anal.log', level=logging.ERROR,
 
 
 def analyze_single_document(data):
+    """
+    Analyzes a single document by computing various textual metrics and generating visualizations.
+
+    Args:
+        data (dict): A dictionary containing the file name and a list of words from the document.
+
+    Returns:
+        dict: The updated data dictionary with added analysis results.
+
+    Raises:
+        ValueError: If 'words' in data is not a list or is empty.
+    """
     try:
         file_name = data.get('file_name', '')
         words = data.get('words', [])
 
-        if words:
-            text = ' '.join(words)  # Convertir la lista de palabras en una cadena de texto
-            data['diversity'] = lexical_diversity(text)
-            data['pos_freq'] = pos_tag_frequency(text)
-            data['word_net'] = word_network_analysis(text)
-            data['collocations'] = analyze_collocations(words)
-            data['relea_index'] = readability_index(text)  # Pasar el texto completo
+        # Validate that words is a list and is not empty
+        if not isinstance(words, list) or not words:
+            raise ValueError(f"'words' must be a non-empty list. Found: {type(words)}")
 
-            plot_ngrams(words, 5, file_name)
-            word_freq = Counter(words)
-            create_wordcloud(word_freq, file_name)
-            plot_word_network(words, file_name)
+        # Join words into a single string for certain analyses
+        text = ' '.join(words)
+        
+        # Perform various textual analyses
+        data['diversity'] = lexical_diversity(text)
+        data['pos_freq'] = pos_tag_frequency(text)
+        data['word_net'] = word_network_analysis(text)
+        data['collocations'] = analyze_collocations(words)
+        data['readability_index'] = readability_index(text)
+
+        # Generate visualizations
+        numbers = [1, 2, 3, 4, 5]
+        
+        for n in numbers:
+            plot_ngrams(words, n, file_name )
+            
+        word_freq = Counter(words)
+        create_wordcloud(word_freq, file_name)
+        plot_word_network(words, file_name)
+
     except Exception as e:
-        logging.error(f"Error in analyze_single_document for file '{file_name}': {e}")
+        error_message = f"Error in analyze_single_document for file '{file_name}': {e}"
+        logging.error(error_message)
+        # You might want to add more sophisticated error handling here
+        data['error'] = error_message
+
     return data
+
 
 
 def analyze_document_set(words_by_file):
@@ -41,7 +70,7 @@ def analyze_document_set(words_by_file):
         words_by_file (dict): Dictionary with unique identifiers and file data.
 
     Returns:
-        None: This function performs analysis and saves results but does not return any value.
+        dict: Dictionary with updated analysis for each document.
     """
     # Variables to store aggregated metrics
     all_diversities = []
@@ -55,18 +84,21 @@ def analyze_document_set(words_by_file):
 
         # Add metrics to the aggregate lists
         all_diversities.append(updated_data.get('diversity', 0))
-        all_pos_frequencies.update(updated_data.get('pos_freq', {}))
+        all_pos_frequencies.update(updated_data.get('pos_freq', Counter()))
         all_word_lengths.extend([len(word) for word in updated_data.get('words', [])])
         all_readability_scores.append(updated_data.get('readability_index', 0))
 
-    # Convert to DataFrame
+  
+    # Convert to DataFrame for individual documents
     df = pd.DataFrame.from_dict(words_by_file, orient='index')
-    df_filtered = df[['diversity', 'pos_freq', 'word_net']]  # Adjust based on available columns
 
-    # Save as CSV
-    output_path = Path('results/document_analysis.csv')
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # Filter out columns with complex data structures like lists, tuples, and dictionaries
+    scalar_columns = [col for col in df.columns if not isinstance(df[col].iloc[0], (list, tuple, dict))]
+    df_filtered = df[scalar_columns]
+       # Save as CSV
+    output_path = 'results/document_analysis.csv'
     df_filtered.to_csv(output_path, index=False)
+
 
     # Perform and visualize aggregated analysis
     plot_lexical_diversity_histogram(all_diversities, 'aggregated')
@@ -76,11 +108,6 @@ def analyze_document_set(words_by_file):
 
     return words_by_file
   
-
-    return words_by_file
-
-# La función 'plot_word_length_distribution' debe estar definida en Visualization.py
-
 def analyze_language_distribution(language_distribution):
     """
     Perform basic analysis and visualization for each language in the distribution.
@@ -88,17 +115,38 @@ def analyze_language_distribution(language_distribution):
     Args:
         language_distribution (dict): Dictionary with language as keys and word lists as values.
 
-    Returns:
-        None: The function performs analysis and visualization but does not return any value.
+    Raises:
+        ValueError: If the word list for any language is not a non-empty list.
     """
-    for language, words in language_distribution.items():
-        try:
-            # Basic visualizations for each language
+    # Check that language_distribution is a dictionary
+    if not isinstance(language_distribution, dict):
+        raise ValueError("language_distribution must be a dictionary.")
+
+    # Iterate over each language in the distribution
+    for language, data in language_distribution.items():
+        try:    
+            
+            words = data.get('words', [])
+   
+            # Validate that words is a list and is not empty
+            if not isinstance(words, list) or not words:
+                raise ValueError(f"'words' must be a non-empty list. Found: {type(words)} for language '{language}'")
+            
+            numbers = [1, 2, 3, 4, 5]        
+            for n in numbers:
+                plot_ngrams(words, n, language) 
+
+            # Generate frequency distribution of words
             word_freq = Counter(words)
-            create_wordcloud(word_freq, language)
+
+            # Perform visualizations for the language
+            create_wordcloud_multi(word_freq, language)
             plot_word_network(words, language)
+
         except Exception as e:
-            logging.error(f"Error in basic analysis and visualization for language '{language}': {e}")
+            # Log any errors that occur during the analysis and visualization
+            logging.error(f"Error in analysis and visualization for language '{language}': {e}")
+
 
 def words(path):
     """
@@ -119,6 +167,9 @@ def words(path):
 
 def main(path):
     try:
+        logging.basicConfig(filename='text_anal.log', level=logging.ERROR,
+                    format='%(asctime)s:%(levelname)s:%(message)s')
+        
         words_by_file, language_distribution = words(path)
 
         # Perform detailed analysis on each document

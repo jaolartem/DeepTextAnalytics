@@ -187,51 +187,46 @@ def co_occurrence_analysis(words, window_size=2):
 
 
 
+import logging
+import pyphen
+from nltk.tokenize import sent_tokenize, word_tokenize
+from langdetect import detect  # Assuming langdetect library is used
+
+logging.basicConfig(level=logging.ERROR)
+
 def count_syllables(word, language_code):
     """
     Counts the number of syllables in a given word using Pyphen library.
-
-    Args:
-        word (str): The word to count syllables in.
-        language_code (str): ISO 639-1/2 language code.
-
-    Returns:
-        int: Number of syllables in the word.
     """
     try:
         dic = pyphen.Pyphen(lang=language_code)
         hyphenated = dic.inserted(word)
         return len(hyphenated.split('-'))
     except Exception as e:
-        logging.error(f"Error in count_syllables: {e}")
-        return 0  # Devuelve 0 en caso de error
-
+        logging.error(f"Error in count_syllables for word '{word}': {e}")
+        return 0
 
 def readability_index(text):
     """
     Calculates the Flesch Reading Ease score for the given text.
-
-    Args:
-        text (str): Text to analyze.
-
-    Returns:
-        float: Flesch Reading Ease score.
     """
     try:
         if not isinstance(text, str) or not text.strip():
-            return 0  # Devuelve 0 para texto vacío o no válido
+            return None  # Returns None for empty or invalid text
 
         sentences = sent_tokenize(text)
         words = word_tokenize(text)
         if not sentences or not words:
-            return 0  # Evita división por cero
+            return None  # Avoid division by zero
 
+        # Detect language for the entire text once
         language_code = detect(text)
-        syllable_count = sum([count_syllables(word, language_code) for word in words])
+        syllable_count = sum(count_syllables(word, language_code) for word in words)
         words_per_sentence = len(words) / len(sentences)
         return 206.835 - 1.015 * words_per_sentence - 84.6 * (syllable_count / len(words))
     except Exception as e:
         logging.error(f"Error in readability_index: {e}")
-        return 0
+        raise
+
 
 
