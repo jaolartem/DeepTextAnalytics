@@ -29,6 +29,4 @@ This project is under the GNU General Public License v2.0. Feel free to use, mod
 - **User Interface:** Consider developing a user-friendly interface for non-technical users.
 - **Scalability:** Evaluate performance with large datasets and implement optimizations if necessary.
 
----
 
-*Note: This README aims to maintain a professional yet engaging tone with the use of emojis to highlight key sections.*
